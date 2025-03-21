@@ -12,6 +12,10 @@ CampusFind's check-in system allows users to notify that they've checked into a 
 
 They can notify the system by tapping the tag again upon exiting a room, allowing for seamless usage of the CampusFind system  
 
+## Video Demo
+
+[![Watch the video](https://i.sstatic.net/Vp2cE.png)](https://www.youtube.com/watch?v=-RQ_UieBsZU)
+
 ## Components
 
 - **IoT-system** that collects the users RFID UID data and transmits it to a **Flask backend** along with institution credentials
