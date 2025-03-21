@@ -14,7 +14,7 @@ They can notify the system by tapping the tag again upon exiting a room, allowin
 
 ## Video Demo
 
-[![Watch the video](https://i.sstatic.net/Vp2cE.png)](https://www.youtube.com/watch?v=-RQ_UieBsZU)
+[![CampusFind IoT RFID Demo](https://github.com/user-attachments/assets/370ea4c2-bdf2-41e5-9f1f-e114b620a7ba)](https://www.youtube.com/watch?v=-RQ_UieBsZU)
 
 ## Components
 
