@@ -11,15 +11,23 @@
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
+// Wifi Network login credentials
 const char* ssid = "";
 const char* password = "";
+
+// Flask backend server base path
 const char* server = "";
-const String apiKey = "";
+
+// Public credentials
+const String public_api_key = "";
+
+// Institution-specific credentials
+// The request can only update records of that institution
 const String institution_id = "";
 const String institution_api_key = "";
 
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 0, 60000); // UTC time
+// server's ssl fingerprint
+const char* ssl_fingerprint = "";
 
 void setup() {
   Serial.begin(115200);
@@ -27,6 +35,7 @@ void setup() {
   rfid.PCD_Init();       
   timeClient.begin();
 
+  // Sets an on-board LED as an output
   pinMode(2, OUTPUT);
 
   WiFi.begin(ssid, password);
@@ -36,10 +45,16 @@ void setup() {
   }
   Serial.println("WiFi connected");
 
+  // On-board LED turns on when WiFi connection is established
   digitalWrite(2, LOW);
 }
 
+/**
+ * @brief Reads RFID card and extracts UID as a string.
+ *        Calls updateUserLocation() to send the UID to the backend.
+ */
 void loop() {
+  // Once a request is sent to the backend, the on-board LED turns back on
   digitalWrite(2,LOW);
   if (!rfid.PICC_IsNewCardPresent()) {
     return;
@@ -49,7 +64,9 @@ void loop() {
     return;
   }
 
+  // When a request is being sent to the backend, the on-board LED turns off
   digitalWrite(2,HIGH);
+  
   // Store UID in a string
   String uidStr = "";
   for (byte i = 0; i < rfid.uid.size; i++) {
@@ -65,6 +82,7 @@ void loop() {
     }
   }
 
+  // Uncomment to print RFID UID
   //Serial.print("RFID UID: ");
   //Serial.println(uidStr);
 
@@ -73,15 +91,34 @@ void loop() {
   updateUserLocation(uidStr);
 }
 
+/**
+ * @brief Sends the user's scanned RFID UID, MAC address, institution_api_key, institution_id
+ * and entry time to the backend.
+ * 
+ * @param uid - The RFID UID in a string format (e.g., "AB:CD:12:34")
+ * 
+ * @note This function ensures secure communication using SSL fingerprints.
+ *       If the server's certificate changes, it may cause a connection failure.
+ */
 void updateUserLocation(String uid)
 {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("Connected to WiFi");
 
+    // Ensure that all communication is encrypted
     WiFiClientSecure client;
-    Serial.println(WiFi.macAddress());
 
-    client.setInsecure();
+    // Uncomment to view esp8266's macAddress
+    // Serial.println(WiFi.macAddress());
+
+    // Verifies that the server is the correct one
+    // Will fail if the server certificate changes
+    // Use client.setTrustAnchors for more persistent connections
+    client.setFingerprint(ssl_fingerprint);
+
+    // Uncomment to connect to the server without verifying
+    // the server's identity, this is unsafe
+    // client.setInsecure();
 
     if (!client.connect(server, 443)) {
       Serial.println("Connection to server failed");
@@ -90,42 +127,48 @@ void updateUserLocation(String uid)
     }
 
     StaticJsonDocument<200> doc;
+    // Mac address is used to identify the location (building/floor/room)
     doc["mac_address"] = WiFi.macAddress();
+    // Uid is used to identify user
     doc["uid"] = uid;
-    doc["api_key"] = institution_api_key;
+    // Used to identify the institution
     doc["institution_id"] = institution_id;
+    // Institution api key is used to authenticate the institution
+    doc["api_key"] = institution_api_key;
+    // room entry/exit time
     doc["entry_time"] = getISOTime();
 
     String jsonString;
     serializeJson(doc, jsonString);
 
-    //String postData = "{\"mac_address\":" + WiFi.macAddress() + "}"; 
     String url = "/update_user_location_secure";
 
     client.print(String("POST ") + url + " HTTP/1.1\r\n" +
                  "Host: " + server + "\r\n" +
                  "Content-Type: application/json\r\n" +
-                 "x-api-key:" + apiKey + "\r\n" +
+                 "x-api-key:" + public_api_key + "\r\n" +
                  "Content-Length: " + jsonString.length() + "\r\n" +
                  "Connection: close\r\n\r\n" +
                  jsonString);
 
-    //while (client.connected()) {
+    // Uncomment to get server response
+
+    // while (client.connected()) {
     //  String line = client.readStringUntil('\n');
     //  if (line == "\r") {
     //    break;
     //  }
-    //}
+    // }
 
-    //String response = client.readString();
+    // String response = client.readString();
 
-    //if (response.indexOf("200 OK") != -1) {
+    // if (response.indexOf("200 OK") != -1) {
     //  Serial.println("Data sent successfully");
-    //} else {
+    // } else {
     //  Serial.println("Error sending data");
     //  Serial.println("Full server response: ");
     //  Serial.println(response);  // Print full response in case of an error
-    //}
+    // }
 
     client.stop();
   }
@@ -138,6 +181,11 @@ void updateUserLocation(String uid)
   }
 }
 
+/**
+ * @brief Gets the current UTC time in ISO 8601 format.
+ * 
+ * @return ISO-formatted string timestamp (e.g., "2025-03-21T12:34:56Z")
+ */
 String getISOTime() {
   // Update NTP time
   timeClient.update();
